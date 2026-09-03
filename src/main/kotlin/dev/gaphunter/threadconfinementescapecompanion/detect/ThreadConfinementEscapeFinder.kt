@@ -4,6 +4,7 @@ import com.intellij.psi.JavaRecursiveElementWalkingVisitor
 import com.intellij.psi.PsiClassType
 import com.intellij.psi.PsiCodeBlock
 import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiExpression
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiLambdaExpression
 import com.intellij.psi.PsiLocalVariable
@@ -38,7 +39,16 @@ import dev.gaphunter.threadconfinementescapecompanion.model.ThreadConfinementHit
  * implicit `this`); only an inline lambda or anonymous class passed
  * directly at the call site (never a `Runnable` constructed
  * elsewhere and passed in by reference); the post-submission access
- * must be textually in the SAME method.
+ * must be textually in the SAME method; a local declared with an
+ * interface type (`Map`/`List`/`Set`) but initialized directly with a
+ * genuinely thread-safe implementation (`ConcurrentHashMap`,
+ * `CopyOnWriteArrayList`, a `Collections.synchronizedXxx(...)` wrapper,
+ * ...) is never tracked -- confirmed real feedback: those types
+ * provide their own real thread safety, so flagging unsynchronized
+ * access to them would be pure noise. Reassigning the variable to a
+ * thread-safe implementation AFTER its declaration (not at the
+ * initializer) is out of scope and still tracked -- a known, honest
+ * v0.1 limitation.
  */
 object ThreadConfinementEscapeFinder {
 
@@ -47,6 +57,15 @@ object ThreadConfinementEscapeFinder {
         "List", "ArrayList", "LinkedList",
         "Map", "HashMap", "TreeMap", "LinkedHashMap",
         "Set", "HashSet", "TreeSet", "LinkedHashSet",
+    )
+    private val THREAD_SAFE_CONSTRUCTOR_NAMES = setOf(
+        "ConcurrentHashMap", "ConcurrentSkipListMap", "ConcurrentSkipListSet",
+        "CopyOnWriteArrayList", "CopyOnWriteArraySet",
+        "ConcurrentLinkedQueue", "ConcurrentLinkedDeque",
+    )
+    private val THREAD_SAFE_WRAPPER_METHOD_NAMES = setOf(
+        "synchronizedList", "synchronizedMap", "synchronizedSet",
+        "synchronizedCollection", "synchronizedSortedMap", "synchronizedSortedSet",
     )
 
     private data class SubmitSite(val anchor: PsiElement, val afterOffset: Int, val capturedNames: Set<String>)
@@ -68,7 +87,9 @@ object ThreadConfinementEscapeFinder {
         body.accept(object : JavaRecursiveElementWalkingVisitor() {
             override fun visitLocalVariable(variable: PsiLocalVariable) {
                 super.visitLocalVariable(variable)
-                if (isMutableType(variable.type)) mutableLocals += variable.name
+                if (isMutableType(variable.type) && !isThreadSafeInitializer(variable.initializer)) {
+                    mutableLocals += variable.name
+                }
             }
         })
         if (mutableLocals.isEmpty()) return emptyList()
@@ -110,6 +131,13 @@ object ThreadConfinementEscapeFinder {
     }
 
     private fun isMutableType(type: PsiType): Boolean = (type as? PsiClassType)?.className in MUTABLE_TYPE_SIMPLE_NAMES
+
+    /** `new ConcurrentHashMap<>()` / `Collections.synchronizedMap(...)` and similar -- a declared `Map`/`List`/`Set` initialized directly with one of these already provides real thread safety, so it's never tracked as confinement-sensitive. */
+    private fun isThreadSafeInitializer(initializer: PsiExpression?): Boolean = when (initializer) {
+        is PsiNewExpression -> initializer.classReference?.referenceName in THREAD_SAFE_CONSTRUCTOR_NAMES
+        is PsiMethodCallExpression -> initializer.methodExpression.referenceName in THREAD_SAFE_WRAPPER_METHOD_NAMES
+        else -> false
+    }
 
     private fun capturedMutableNames(runnableArgument: PsiElement, trackedNames: Set<String>): Set<String> {
         val bodyToScan: PsiElement = when (runnableArgument) {

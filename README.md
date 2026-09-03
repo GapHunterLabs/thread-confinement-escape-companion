@@ -35,6 +35,14 @@ Tier -3 entries where a specific absence was confirmed by name.
   site (never a `Runnable` constructed elsewhere and passed in by
   reference).
 - The post-hand-off access must be textually in the SAME method.
+- A local declared with an interface type (`Map`/`List`/`Set`) but
+  initialized directly with a genuinely thread-safe implementation
+  (`ConcurrentHashMap`, `CopyOnWriteArrayList`, a
+  `Collections.synchronizedXxx(...)` wrapper, ...) is never tracked --
+  those types provide real thread safety of their own. Reassigning the
+  variable to a thread-safe implementation AFTER its declaration
+  (rather than at the initializer) is still tracked -- a known,
+  honest v0.1 limitation.
 
 ## Usage
 

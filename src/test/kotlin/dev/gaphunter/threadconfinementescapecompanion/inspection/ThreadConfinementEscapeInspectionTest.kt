@@ -103,6 +103,53 @@ class ThreadConfinementEscapeInspectionTest : BasePlatformTestCase() {
         assertTrue(highlights.none { it.description?.contains("CWE-362") == true })
     }
 
+    fun `test a Map declared type backed by a ConcurrentHashMap initializer is not flagged`() {
+        myFixture.configureByText(
+            "Worker6.java",
+            """
+            import java.util.Map;
+            import java.util.concurrent.ConcurrentHashMap;
+            import java.util.concurrent.ExecutorService;
+
+            class Worker6 {
+                void run(ExecutorService pool) {
+                    Map<String, String> cache = new ConcurrentHashMap<>();
+                    pool.submit(() -> {
+                        cache.put("k", "v");
+                    });
+                    cache.get("k");
+                }
+            }
+            """.trimIndent(),
+        )
+        val highlights = myFixture.doHighlighting()
+        assertTrue(highlights.none { it.description?.contains("CWE-362") == true })
+    }
+
+    fun `test a List backed by Collections synchronizedList is not flagged`() {
+        myFixture.configureByText(
+            "Worker7.java",
+            """
+            import java.util.ArrayList;
+            import java.util.Collections;
+            import java.util.List;
+            import java.util.concurrent.ExecutorService;
+
+            class Worker7 {
+                void run(ExecutorService pool) {
+                    List<String> results = Collections.synchronizedList(new ArrayList<>());
+                    pool.submit(() -> {
+                        results.add("x");
+                    });
+                    results.add("y");
+                }
+            }
+            """.trimIndent(),
+        )
+        val highlights = myFixture.doHighlighting()
+        assertTrue(highlights.none { it.description?.contains("CWE-362") == true })
+    }
+
     fun `test a non-mutable local type is out of this plugin's scope`() {
         myFixture.configureByText(
             "Worker5.java",
