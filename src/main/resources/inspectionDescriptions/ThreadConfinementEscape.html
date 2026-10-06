@@ -1,0 +1,10 @@
+<html>
+<body>
+Reports a mutable local collection (<code>List</code>, <code>Map</code>, <code>Set</code>) captured by a task handed
+to a background thread (<code>ExecutorService.submit</code>/<code>execute</code>, <code>new Thread(...).start()</code>) when
+the same method keeps using it afterwards outside any <code>synchronized</code> block.
+<!-- tooltip end -->
+<p>Two threads then share mutable state with no protection, a race condition (CWE-362, CWE-366). Give the task its
+own copy, use a concurrent collection, or synchronize both accesses.</p>
+</body>
+</html>
