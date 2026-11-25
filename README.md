@@ -5,14 +5,7 @@ the same method also touches afterward without synchronization.
 
 ## Why it exists
 
-CWE-362/366. Thread confinement (never sharing mutable state across
-threads) is the standard strategy for avoiding race conditions, and
-Java has no language-level way to enforce it -- exactly the gap a
-static analyzer needs to cover. Real, documented in reference material
-(MIT 6.005/6.031 Thread Safety). Searched explicitly for a named
-competitor (FindBugs rule, CodeQL query, Datadog rule) for this exact
-angle and found none -- stated honestly, unlike this catalog's other
-Tier -3 entries where a specific absence was confirmed by name.
+CWE-362/366. Thread confinement (never sharing mutable state across threads) is the standard strategy for avoiding race conditions, and Java has no language-level way to enforce it: exactly the gap a static analyzer needs to cover. It is real and documented in reference material (MIT 6.005/6.031 Thread Safety). I searched explicitly for a named competitor (a FindBugs rule, a CodeQL query, a Datadog rule) for this exact angle and found none, and I say so plainly: unlike some other plugins in this catalog, there is no specific competitor whose absence I could confirm by name.
 
 ## Why built this way
 
